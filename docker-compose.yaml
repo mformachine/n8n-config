@@ -17,18 +17,23 @@ services:
     ports:
       - 5678:5678
     environment:
+      # Basic Configuration
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+
+      # Database Configuration
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+
+      # Email Configuration
       - N8N_EMAIL_MODE=${N8N_EMAIL_MODE}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - N8N_SMTP_SENDER=${N8N_SMTP_SENDER}
@@ -37,20 +42,58 @@ services:
       # - N8N_SMTP_USER=${N8N_SMTP_USER}
       # - N8N_SMTP_PASS=${N8N_SMTP_PASS}
       # - N8N_SMTP_SSL=${N8N_SMTP_SSL}
+
+      # Redis Configuration
       - N8N_REDIS_HOST=${REDIS_HOST}
       - N8N_REDIS_PORT=${REDIS_PORT}
       - N8N_REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # Security & Encryption
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS}
+
+      # Metrics & Monitoring
+      # - N8N_METRICS=${N8N_METRICS}
+      # - N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL=${N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL}
+      # - N8N_METRICS_INCLUDE_QUEUE_METRICS=${N8N_METRICS_INCLUDE_QUEUE_METRICS}
+
+      # Queue Mode Configuration
+      # - EXECUTIONS_MODE=${EXECUTIONS_MODE}
+      # - QUEUE_BULL_REDIS_HOST=${REDIS_HOST}
+      # - QUEUE_BULL_REDIS_PORT=${REDIS_PORT}
+      # - QUEUE_BULL_REDIS_PASSWORD=${REDIS_PASSWORD}
+      
+      # Execution Data Management
+      # - N8N_EXECUTIONS_DATA_PRUNE=${N8N_EXECUTIONS_DATA_PRUNE}
+      # - N8N_EXECUTIONS_DATA_MAX_AGE=${N8N_EXECUTIONS_DATA_MAX_AGE}
+      # - N8N_EXECUTIONS_DATA_PRUNE_MAX_COUNT=${N8N_EXECUTIONS_DATA_PRUNE_MAX_COUNT}
+      
+      # Node Function Security
+      - NODE_FUNCTION_ALLOW_EXTERNAL=${NODE_FUNCTION_ALLOW_EXTERNAL}
+      - NODE_FUNCTION_ALLOW_BUILTIN=${NODE_FUNCTION_ALLOW_BUILTIN}
+      - N8N_RUNNERS_ENABLED=${N8N_RUNNERS_ENABLED}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE}
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=${N8N_GIT_NODE_DISABLE_BARE_REPOS}
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS}
 
     volumes:
       - n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
     depends_on:
-      - postgres # postgres starts before n8n
-      - redis    # redis starts before n8n
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # --- PostgreSQL service definition ---
   postgres:
-    image: postgres:latest
+    image: postgres:18-alpine
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -61,24 +104,25 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
-        interval: 5s
-        timeout: 5s
-        retries: 5
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # --- Redis service definition ---
   redis:
-    image: redis:latest
+    image: redis:8-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     healthcheck:
-        test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-        interval: 5s
-        timeout: 3s
-        retries: 5
-
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
 volumes:
   caddy_data:
