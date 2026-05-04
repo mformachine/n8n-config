@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/father/n8n-docker-caddy
+cd /home/admin/n8n-docker-caddy
 echo "$(date): Pulling latest images..." >> n8n.log
 docker compose pull
 echo "$(date): Taking down application for update..." >> n8n.log
